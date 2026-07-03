@@ -1,0 +1,189 @@
+# Role Registry for Multi-Agent Orchestrator V2
+# Defines all available roles, their prompts, compatibility, and composition rules.
+
+roles:
+  implementer:
+    name: implementer
+    description: "Implements the code change. Writes clean, tested code following TDD."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Implement the code change. Write clean, tested code.
+      Follow test-driven-development: write tests first, then implement.
+      Output ONLY the code changes (file paths and content).
+      Do NOT review your own work — that is the Reviewer's job.
+    skill_hint: test-driven-development
+    verdict_format: "IMPLEMENTED: <summary of changes>"
+    parallel_with:
+      - designer
+    veto_power: false
+    can_escalate: false
+
+  reviewer:
+    name: reviewer
+    description: "Reviews code for correctness, style, and security issues."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Review the code changes for:
+      - Correctness: does it solve the task?
+      - Style: does it match project conventions?
+      - Security: any vulnerabilities introduced?
+      Provide a verdict: APPROVE, REQUEST_CHANGES, or VETO.
+    skill_hint: pr-review
+    verdict_format: "REVIEW: <APPROVE|REQUEST_CHANGES|VETO> — <reasoning>"
+    parallel_with:
+      - tester
+      - architect
+      - security_auditor
+    veto_power: true
+    can_escalate: true
+
+  tester:
+    name: tester
+    description: "Writes and runs tests to verify the implementation."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Write and execute tests to verify the implementation:
+      - Unit tests for new functions/methods
+      - Integration tests where applicable
+      - Edge case coverage
+      Report test results and coverage assessment.
+    skill_hint: verification-before-completion
+    verdict_format: "TEST: <PASS|FAIL> — <results summary>"
+    parallel_with:
+      - reviewer
+      - architect
+      - security_auditor
+    veto_power: false
+    can_escalate: true
+
+  architect:
+    name: architect
+    description: "Evaluates architectural fit, module boundaries, and design patterns."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Evaluate the changes for architectural fit:
+      - Module boundaries: are responsibilities well-separated?
+      - Design patterns: do changes follow established patterns?
+      - Dependencies: are new imports appropriate?
+      - Backwards compatibility: any breaking changes?
+      Provide an architectural assessment.
+    skill_hint: design-patterns
+    verdict_format: "ARCHITECT: <APPROVE|CONCERNS|VETO> — <assessment>"
+    parallel_with:
+      - reviewer
+      - tester
+      - security_auditor
+    veto_power: true
+    can_escalate: true
+
+  security_auditor:
+    name: security_auditor
+    description: "Audits for security vulnerabilities, secrets exposure, and attack surface."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Audit the changes for security issues:
+      - Input validation: are all inputs sanitized?
+      - Secret exposure: any hardcoded credentials or tokens?
+      - Attack surface: new endpoints or privilege escalation paths?
+      - Dependency risks: any known vulnerabilities in new deps?
+      Provide a security verdict.
+    skill_hint: security-guardian
+    verdict_format: "SECURITY: <PASS|CONCERN|VETO> — <findings>"
+    parallel_with:
+      - reviewer
+      - tester
+      - architect
+    veto_power: true
+    can_escalate: true
+
+  designer:
+    name: designer
+    description: "Evaluates UX/UI design quality, accessibility, and visual consistency."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      Evaluate the changes for design quality:
+      - Visual consistency: matches the project's design language?
+      - Accessibility: ARIA labels, color contrast, keyboard navigation?
+      - UX flow: is the user journey logical and intuitive?
+      - Responsive design: works across screen sizes?
+      Provide a design assessment.
+    skill_hint: design-is
+    verdict_format: "DESIGN: <APPROVE|REVISION|VETO> — <assessment>"
+    parallel_with:
+      - implementer
+    veto_power: false
+    can_escalate: false
+
+  integrator:
+    name: integrator
+    description: "Runs AFTER the parallel phase to merge verdicts and resolve conflicts."
+    prompt_template: |
+      You are the {role_name} in a {mode} multi-agent workflow.
+      Task: {task_description}
+
+      {context_block}
+
+      You have received verdicts from all parallel roles. Your job is to:
+      1. Merge overlapping feedback into a unified action list
+      2. Resolve conflicting verdicts (prefer safety-conservative stance)
+      3. Produce a final integrated decision: PROCEED, REVISE, or ESCALATE
+      4. If REVISE, specify exactly what must change before re-review
+    skill_hint: pathfinder
+    verdict_format: "INTEGRATE: <PROCEED|REVISE|ESCALATE> — <unified decision>"
+    parallel_with: []
+    veto_power: false
+    can_escalate: true
+
+composition_rules:
+  default_sets:
+    code_change:
+      - implementer
+      - reviewer
+      - tester
+    security_sensitive:
+      - implementer
+      - reviewer
+      - tester
+      - security_auditor
+      - architect
+    ui_change:
+      - implementer
+      - reviewer
+      - tester
+      - designer
+    api_change:
+      - implementer
+      - reviewer
+      - tester
+      - architect
+    general:
+      - implementer
+      - reviewer
+  mode_minimums:
+    role_collab: 3
+    task_parallel: 2
+    hybrid: 4
